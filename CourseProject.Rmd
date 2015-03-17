@@ -1,0 +1,104 @@
+---
+title: "Practical Maching Learning - Course Project"
+author: "Zane Kratzer"
+date: "Tuesday, March 17, 2015"
+output: html_document
+---
+
+The following analysis provides a description of how to use a prediction model to predict the type of activity being performed in a weight lifting dataset.  In this case, we are looking at various physical activities pertaining to weight lifting with dumbbells.  
+
+Six young healthy participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+The goal is to use data collected from accelerometers on the belt, forearm, arm, and dumbell of these 6 participants to predict what type of activity is being performed from a test data set in which the class has not already been assigned.
+
+The data for this project come from the Weight Lifting Exercise Dataset: 
+http://groupware.les.inf.puc-rio.br/har
+
+
+###Load the training & test data
+```{r load}
+setwd("H:\\Coursework\\Coursera-DataScience\\08_PracticalMachineLearning")
+training <- read.csv("./CourseProject/pml-training.csv")
+testing <- read.csv("./CourseProject/pml-testing.csv")
+```
+
+
+###Clean the training set
+The data comes with 160 columns and over 19,000 observations.  Some basic preprocessing of the data will be required in order to perform a tidy analysis.  First of all, we will remove all pre-calculated variables from the dataset, which also contain numerous missing values.  The second step is to remove some of the index variables at the beginning of the dataset which will not be necessary in our prediction model.
+
+```{r clean}
+train.log<-grepl("max_|min_|var_|kurtosis_|skewness_|amplitude_|avg_|stddev_",
+                 colnames(training))
+train.sub<-training[,!train.log]
+train.sub<-train.sub[,-c(1:7)]
+```
+
+
+The following analysis will require us to load these 2 packages: caret and randomForest
+```{r packages}
+library(caret); library(randomForest)
+```
+
+
+Before running the model, I would like to split the training set in two parts so that we have a validation set in order to test our predictions against.
+
+###Data splitting
+```{r split}
+set.seed(1234)
+inTrain<-createDataPartition(y=train.sub$classe,p=0.60,list=FALSE)
+training2<-train.sub[inTrain,]
+validation<-train.sub[-inTrain,]
+```
+
+
+For our purposes, we will run a Random Forest model on the training dataset.  In order to provide more efficiency I will use cross-validation with only 3 folds and limit the number of trees to 50.  This will provide an efficient model, which will run quickly but still provide plenty of accuracy.
+
+###Fit a Random Forest model
+```{r model}
+modFit<-train(classe~.,data=training2,method="rf", 
+            trControl=trainControl(method="cv",number=3),ntree=50)
+```
+
+
+The new model is then tested against the validation (or hold-out) set in order to create some predictions for our 'classe' variable
+
+###Prediction - Using the validation set
+```{r predict}
+predictions<-predict(modFit,newdata=validation)
+```
+
+
+Finally, we check the accuracy of our model with a Confusion Matrix.  This will test our predicte values against the actual 'classe' values in the validation set.
+
+###Confusion Matrix - Assess the accuracy of the prediction model
+```{r accuracy}
+confusionMatrix(predictions,validation$classe)
+```
+
+As we can see, our prediction model creates roughly 99% prediction accuracy!  Satisfied with this level of accuracy, we now turn our attention to predicting classe values in the test set.
+
+
+###Apply prediction model to the test set
+The first step will be to conduct the same method of preprocessing on the test set that we performed on the training set.  In this case, that means eliminating unneccessary columns from the dataset.
+
+```{r clean2}
+test.log<-grepl("max_|min_|var_|kurtosis_|skewness_|amplitude_|avg_|stddev_",
+                 colnames(testing))
+test.sub<-testing[,!train.log]
+test.sub<-test.sub[,-c(1:7)]
+```
+
+
+Once our test set has been cleaned, we are ready to apply our prediction model to the test dataset.
+
+```{r predict2}
+predictions<-predict(modFit,newdata=test.sub)
+predictions
+```
+
+
+The prediction model correctly predicts 20 out of 20 class types for the test set.  From this analysis, we can see that R provides powerful tools for prediction.
+
+
+Source:
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. 
